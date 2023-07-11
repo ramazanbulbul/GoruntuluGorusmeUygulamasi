@@ -1,0 +1,220 @@
+﻿@using GoruntuluGorusmeBitirme.Database
+
+@{
+    ACCOUNT LOGIN_USER = (ACCOUNT)Session["LOGIN_USER"];
+    ACCOUNT USER = ViewBag.USER;
+}
+
+@model List<MESSAGE>
+
+@if (USER.USER_ID != 0)
+{
+    <div class="card">
+        <div class="card-header msg_head">
+            <div class="d-flex bd-highlight">
+                <div class="img_cont">
+                    <img src="@USER.IMAGE" class="rounded-circle user_img">
+                </div>
+                <div class="user_info">
+                    <span>@USER.NAME_SURNAME</span>
+                </div>
+                <div class="video_cam">
+                    <span onclick="fVideoCam();"><i class="fas fa-video float-right"></i></span>
+                </div>
+            </div>
+        </div>
+        <div class="card-body msg_card_body">
+            @foreach (MESSAGE msg in Model)
+            {
+                ACCOUNT SENDER_USER = msg.ACCOUNT1;
+                if (SENDER_USER.USER_ID == LOGIN_USER.USER_ID)
+                {
+                    <div class="d-flex justify-content-start mb-4">
+                        <div class="img_cont_msg">
+                            <img src="@LOGIN_USER.IMAGE" class="rounded-circle user_img_msg">
+                        </div>
+                        <div class="msg_cotainer" style="min-width:150px">
+                            @msg.MESSAGE_CONTENT
+                            <span class="msg_time">@(msg.MESSAGE_DATE.Value.ToShortDateString() +" " + msg.MESSAGE_DATE.Value.ToShortTimeString())</span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex justify-content-end mb-4">
+                        <div class="msg_cotainer_send" style="min-width:150px">
+                            @msg.MESSAGE_CONTENT
+                            <span class="msg_time_send">@(msg.MESSAGE_DATE.Value.ToShortDateString() +" " + msg.MESSAGE_DATE.Value.ToShortTimeString())</span>
+                        </div>
+                        <div class="img_cont_msg">
+                            <img src="@USER.IMAGE" class="rounded-circle user_img_msg">
+                        </div>
+                    </div>
+                }
+            }
+
+
+        </div>
+        <div class="card-footer">
+            <div class="input-group">
+                <textarea name="" class="form-control type_msg" placeholder="Type your message..."></textarea>
+                <div class="input-group-append">
+                    <span class="input-group-text send_btn" onclick="sendMessage();"><i class="fas fa-location-arrow"></i></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="~/Scripts/jquery.signalR-2.4.3.js"></script>
+    <script src="/signalr/hubs"></script>
+    <script src="~/Scripts/ConnectionManager.js"></script>
+    <script src="~/Scripts/dev.js"></script>
+    <script src="~/Scripts/MultScreenMixer.js"></script>
+    <script src="~/Scripts/App.js"></script>
+    <script>
+        RB.dev().initialize(true, false);
+        var app = RB.WebRtc;
+        app.initialize("@LOGIN_USER.USER_ID", "@LOGIN_USER.USER_ID");
+
+        function joinRoom(RECEIVER_USER, SENDER_USER) {
+            hub.server.joinRoom(RECEIVER_USER, SENDER_USER);
+        }
+        var hub;
+        hub = app.hub();
+        hub.client.connect = function () {
+            hub.server.connect('@LOGIN_USER.USER_ID', hub.connection.id);
+        };
+        hub.client.reconnect = function () {
+            // app.setupHubCallbacks().initialize();
+        };
+        function fVideoCam() {
+            hub.server.sendVideoCallRequest('@USER.USER_ID', '@(LOGIN_USER.USER_ID)');
+            $.alert({
+                title: 'Görüntülü Görüşme!',
+                content: 'Görüntülü görüşme isteği gönderildi!',
+            });
+        }
+
+        function setCamera() {
+            var camHtml = '<video muted id="cam2" autoplay playsinline style="width: 500px; height:400px"></video>' +
+                '<video muted id = "cam1" autoplay playsinline style = "width: 500px; height: 400px" ></video>' +
+                '<button type="button" class="btn btn-danger col-12" id="createRoom" onclick="joinRoom(@LOGIN_USER.USER_ID, @USER.USER_ID)">Görüşmeyi Başlatın</button>';
+            $('.msg_card_body').html(camHtml);
+            var settingsHtml = '<div class="row">' +
+                '<div class="col-12">' +
+                '<div class="col-md-6 float-left">' +
+                '<select class="form-select form-select-lg mb-3 col-12" aria-label=".form-select-lg example" id="cameras">' +
+                '</select>' +
+                '</div>' +
+                '<div class="col-md-6 float-left">' +
+                '<select class="form-select form-select-lg mb-3 col-12" aria-label=".form-select-lg example" id="audios">' +
+                '</select>' +
+                '</div>' +
+                '</div>' +
+                '</div>' +
+            '<div class="col-12 mb-2">' +
+                '<div class="col-4 float-left">' +
+                '<button type="button" class="btn btn-primary col-12" id="camOpen">Kameranı Aç</button>' +
+                '</div>' +
+                '<div class="col-4 float-left" > ' +
+                '<button type = "button" class="btn btn-secondary col-12" id = "camClose" > Kameranı Kapat</button > ' +
+                    '</div> ' +
+                '<div class="col-4 float-left" > ' +
+                '<button type = "button" class="btn btn-info col-12" id = "mute" > Sessize Al</button > ' +
+                    '</div> ' +
+                '</div>';
+            $('.chatDetail .card .card-footer').html(settingsHtml);
+        }
+
+        hub.client.sendVideoCallRequestByReceiver = function (RECEIVER_ID, SENDER_ID, RECEIVER_NAME) {
+            if (RECEIVER_ID == @LOGIN_USER.USER_ID) {
+                $.confirm({
+                    title: 'Görüntülü görüşme isteği',
+                    content: RECEIVER_NAME + ' tarafından aranıyorsunuz. Katılmak ister misiniz?',
+                    buttons: {
+                        katil: function () {
+                            hub.server.videoCallAccept(RECEIVER_ID, SENDER_ID);
+                        },
+                        vazgec: function () {
+                            hub.server.videoCallReject(RECEIVER_ID, SENDER_ID);
+                        },
+                    }
+                });
+            }
+        }
+
+        hub.client.videoCallAccept = function (RECEIVER_ID, SENDER_ID) {
+            if (SENDER_ID == '@LOGIN_USER.USER_ID' || RECEIVER_ID == '@LOGIN_USER.USER_ID' ) {
+                $.alert({
+                    title: 'Görüntülü Görüşme!',
+                    content: 'Görüntülü görüşme onaylandı bağlanıyorsunuz!',
+                });
+                setCamera();
+                RB.WebRtc.secondInitialize();
+            }
+        }
+        hub.client.videoCallReject = function (RECEIVER_ID, SENDER_ID) {
+            if (SENDER_ID == '@LOGIN_USER.USER_ID' || RECEIVER_ID == '@LOGIN_USER.USER_ID') {
+                $.alert({
+                    title: 'Görüntülü Görüşme!',
+                    content: 'Görüntülü görüşme isteği reddedildi!',
+                });
+            }
+        }
+
+        hub.client.sendError = function (MESSAGE) {
+            $.alert({
+                title: 'Görüntülü Görüşme!',
+                content: MESSAGE,
+            });
+        }
+
+        //MESSAGES
+        $(document).keypress(function (event) {
+            var keycode = (event.keyCode ? event.keyCode : event.which);
+            if (keycode == 13 && $(".type_msg").is(':focus')) {
+                sendMessage();
+            }
+        });
+        function sendMessage() {
+            var message = $(".type_msg").val();
+            if (message != "") {
+                hub.server.sendMessage('@USER.USER_ID', '@(LOGIN_USER.USER_ID)', message);
+                $(".type_msg").val("");
+            }
+        }
+        hub.client.sendMessageBySender = function (MESSAGE) {
+            var head = $(".msg_card_body");
+            var tail =  '<div class="d-flex justify-content-end mb-4">' +
+                            '<div class="msg_cotainer_send" style="min-width:150px">' +
+                                 MESSAGE +
+                                '<span class="msg_time_send">@(DateTime.Now.ToShortDateString() +" " + DateTime.Now.ToShortTimeString())</span>' +
+                            '</div>' +
+                            '<div class="img_cont_msg">' +
+                                '<img src="@LOGIN_USER.IMAGE" class="rounded-circle user_img_msg">' +
+                            '</div>' +
+                        '</div>';
+            head.append(tail);
+        }
+        hub.client.sendMessageByReceiver = function (RECEIVER_ID, SENDER_ID, MESSAGE) {
+            if (RECEIVER_ID == @LOGIN_USER.USER_ID && SENDER_ID == @USER.USER_ID) {
+                var head = $(".msg_card_body");
+                var tail =  '<div class="d-flex justify-content-start mb-4">' +
+                                '<div class="img_cont_msg">' +
+                                    '<img src="@USER.IMAGE" class="rounded-circle user_img_msg">' +
+                                '</div>' +
+                                '<div class="msg_cotainer" style="min-width:150px">' +
+                                    MESSAGE +
+                                    '<span class="msg_time">@(DateTime.Now.ToShortDateString() +" " + DateTime.Now.ToShortTimeString())</span>' +
+                                '</div>' +
+
+                            '</div>';
+                head.append(tail);
+            }
+        }
+    </script>
+
+}
+
+
